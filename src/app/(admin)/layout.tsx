@@ -1,3 +1,4 @@
+"use client";
 import type { CommandPaletteItem } from "@/design-system/primitives/command-palette";
 import { WorkspaceProvider } from "@/design-system/workspace/workspace-provider";
 import { ShellRoot } from "@/design-system/workspace/shell-root";
