@@ -24,7 +24,11 @@ import {
   registrarEstornoAction,
   type TransactionListItem,
   type PendenciaItem,
+  type RegistrarRecebimentoValues,
 } from "./actions";
+
+/** Método de pagamento aceito — derivado do schema Zod real (fonte de verdade em finance.service.ts). */
+type PaymentMethod = RegistrarRecebimentoValues["method"];
 
 function formatBRL(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
@@ -199,7 +203,7 @@ function NovoRecebimentoQuickCreate({
 }) {
   const [categoryId, setCategoryId] = React.useState("");
   const [amountCents, setAmountCents] = React.useState(0);
-  const [method, setMethod] = React.useState<string>("PIX");
+  const [method, setMethod] = React.useState<PaymentMethod>("PIX");
   const [description, setDescription] = React.useState("");
   const [saving, setSaving] = React.useState(false);
 
@@ -208,7 +212,7 @@ function NovoRecebimentoQuickCreate({
     const result = await registrarRecebimentoAction({
       categoryId,
       amountCents,
-      method: method as any,
+      method,
       descriptionSnapshot: description,
     });
     setSaving(false);
@@ -245,7 +249,7 @@ function NovoRecebimentoQuickCreate({
         <CurrencyInput id="f-amount" valueInCents={amountCents} onValueChange={setAmountCents} />
       </Field>
       <Field label="Forma de pagamento" htmlFor="f-method" required>
-        <Select value={method} onValueChange={setMethod}>
+        <Select value={method} onValueChange={(value) => setMethod(value as PaymentMethod)}>
           <SelectTrigger id="f-method">
             <SelectValue />
           </SelectTrigger>

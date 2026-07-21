@@ -20,6 +20,10 @@ import {
   type CommissionPayoutHistoryItem,
 } from "./actions-sprint2";
 
+/** Método de pagamento aceito — derivado da assinatura real de `pagarComissaoAction`,
+ *  para nunca divergir da fonte de verdade (Server Action) sem duplicar o literal union aqui. */
+type PaymentMethod = Parameters<typeof pagarComissaoAction>[3];
+
 function formatBRL(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
 }
@@ -33,7 +37,7 @@ export function ComissoesPanel() {
   const [professionalId, setProfessionalId] = React.useState("");
   const [periodStart, setPeriodStart] = React.useState<Date | undefined>();
   const [periodEnd, setPeriodEnd] = React.useState<Date | undefined>();
-  const [method, setMethod] = React.useState("PIX");
+  const [method, setMethod] = React.useState<PaymentMethod>("PIX");
   const [preview, setPreview] = React.useState<ApuracaoPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -55,7 +59,7 @@ export function ComissoesPanel() {
   async function handlePagar() {
     if (!professionalId || !periodStart || !periodEnd || !preview) return;
     setPaying(true);
-    const result = await pagarComissaoAction(professionalId, periodStart, periodEnd, method as any);
+    const result = await pagarComissaoAction(professionalId, periodStart, periodEnd, method);
     setPaying(false);
     setConfirmOpen(false);
     if (!result.ok) return toast.error("Não foi possível pagar", result.error);
@@ -107,7 +111,7 @@ export function ComissoesPanel() {
                 <div className="flex items-center justify-between">
                   <p className="font-[var(--font-display)] text-xl text-[var(--text-primary)]">{formatBRL(preview.totalCents)}</p>
                   <div className="flex items-center gap-3">
-                    <Select value={method} onValueChange={setMethod}>
+                    <Select value={method} onValueChange={(value) => setMethod(value as PaymentMethod)}>
                       <SelectTrigger className="w-40">
                         <SelectValue />
                       </SelectTrigger>

@@ -339,15 +339,6 @@ model ServiceBundleItem {
 // AGENDA
 // ============================================================
 
-enum AppointmentStatus {
-  SCHEDULED
-  CONFIRMED
-  IN_PROGRESS
-  DONE
-  NO_SHOW
-  CANCELED
-}
-
 enum AppointmentOrigin {
   ADMIN
   PORTAL
@@ -476,7 +467,15 @@ model OrcamentoItem {
   service   Service   @relation(fields: [serviceId], references: [id])
 }
 
-
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  DONE
+  NO_SHOW   // só a partir de CONFIRMED
+  CANCELED
+  // IN_PROGRESS removido — vira Specification derivada (atendimentoEmAndamento),
+  // nunca estado persistido (Derived Over Stored).
+}
 
 enum AppointmentCancelReason {
   CLIENT_REQUEST
