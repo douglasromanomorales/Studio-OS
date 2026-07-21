@@ -4,19 +4,8 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { Loader2 } from "lucide-react";
 import { cn } from "../lib/cn";
 
-/**
- * Button — primitivo do CodeChain Design System.
- * Zero acoplamento de marca: toda cor vem de tokens semânticos (--brand, --surface...),
- * resolvidos pelo tema ativo (ex: /themes/casa-nataly.css).
- *
- * REGRA DE PRODUTO: no máximo um <Button variant="primary"> visível por tela/seção.
- * Toda ação secundária usa outline, ghost ou link — nunca dois primary lado a lado.
- */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium select-none " +
-    "transition-[background-color,border-color,color,transform] duration-[var(--dur-fast)] ease-[var(--ease-product)] " +
-    "disabled:pointer-events-none disabled:opacity-50 " +
-    "focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium select-none transition-[background-color,border-color,color,transform] duration-[var(--dur-fast)] ease-[var(--ease-product)] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)]",
   {
     variants: {
       variant: {
@@ -34,7 +23,10 @@ const buttonVariants = cva(
         icon: "h-10 w-10 rounded-[var(--radius-sm)]",
       },
     },
-    defaultVariants: { variant: "primary", size: "md" },
+    defaultVariants: {
+      variant: "primary",
+      size: "md",
+    },
   }
 );
 
@@ -46,8 +38,21 @@ export interface ButtonProps
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      loading = false,
+      disabled,
+      children,
+      ...props
+    },
+    ref
+  ) => {
     const Comp = asChild ? Slot : "button";
+
     return (
       <Comp
         ref={ref}
@@ -56,10 +61,11 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading || undefined}
         {...props}
       >
-        {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+     
         {children}
       </Comp>
     );
   }
 );
+
 Button.displayName = "Button";

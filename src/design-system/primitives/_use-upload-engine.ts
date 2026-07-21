@@ -14,10 +14,10 @@ export function useUploadEngine(options: UploadEngineOptions) {
   if (!engineRef.current) engineRef.current = new UploadEngine(options);
   const engine = engineRef.current;
 
-  const snapshot = React.useSyncExternalStore(
-    (listener) => engine.subscribe(listener),
-    () => engine.getSnapshot()
-  );
-
+ const snapshot = React.useSyncExternalStore(
+  (listener) => engine.subscribe(listener),
+  () => engine.getSnapshot(),
+  () => engine.getSnapshot()
+);
   return { engine, files: snapshot.files, dragActive: snapshot.dragActive };
 }
