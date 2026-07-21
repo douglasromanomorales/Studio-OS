@@ -11,8 +11,7 @@ import * as React from "react";
 export function useDebouncedCallback<Args extends unknown[]>(callback: (...args: Args) => void, delayMs = 250) {
   const callbackRef = React.useRef(callback);
   callbackRef.current = callback;
-  const timeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
-
+  const timeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   return React.useCallback(
     (...args: Args) => {
       clearTimeout(timeoutRef.current);
