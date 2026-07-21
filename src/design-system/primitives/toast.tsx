@@ -54,7 +54,9 @@ export function Toast({ className, variant = "info", title, description, ...prop
     >
       <Icon className={cn("h-5 w-5 shrink-0 mt-0.5", TOAST_COLORS[variant])} aria-hidden />
       <div className="flex-1 min-w-0">
-        <ToastPrimitive.Title className="text-sm font-medium text-[var(--text-primary)]">{title}</ToastPrimitive.Title>
+        <ToastPrimitive.Title className="text-sm font-medium text-[var(--text-primary)]">
+          {title}
+        </ToastPrimitive.Title>
         {description && (
           <ToastPrimitive.Description className="text-sm text-[var(--text-secondary)] mt-0.5">
             {description}
@@ -81,17 +83,22 @@ class ToastQueue {
 
   subscribe(listener: Listener) {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   }
+
   private emit() {
     this.listeners.forEach((l) => l(this.toasts));
   }
+
   push(toast: Omit<QueuedToast, "id">) {
     const id = Math.random().toString(36).slice(2);
     this.toasts = [...this.toasts, { ...toast, id }];
     this.emit();
     return id;
   }
+
   dismiss(id: string) {
     this.toasts = this.toasts.filter((t) => t.id !== id);
     this.emit();
@@ -101,20 +108,30 @@ class ToastQueue {
 const queue = new ToastQueue();
 
 export const toast = {
-  success: (title: string, description?: string) => queue.push({ variant: "success", title, description }),
-  error: (title: string, description?: string) => queue.push({ variant: "error", title, description }),
-  info: (title: string, description?: string) => queue.push({ variant: "info", title, description }),
+  success: (title: string, description?: string) =>
+    queue.push({ variant: "success", title, description }),
+  error: (title: string, description?: string) =>
+    queue.push({ variant: "error", title, description }),
+  info: (title: string, description?: string) =>
+    queue.push({ variant: "info", title, description }),
 };
 
 /** Monta uma única vez na raiz do Workspace — nunca por módulo. */
 export function Toaster() {
   const [toasts, setToasts] = React.useState<QueuedToast[]>([]);
-  React.useEffect(() => queue.subscribe(setToasts), []);
+
+  React.useEffect(() => {
+    return queue.subscribe(setToasts);
+  }, []);
 
   return (
     <ToastProvider swipeDirection="right">
       {toasts.map(({ id, ...t }) => (
-        <Toast key={id} {...t} onOpenChange={(open) => !open && queue.dismiss(id)} />
+        <Toast
+          key={id}
+          {...t}
+          onOpenChange={(open) => !open && queue.dismiss(id)}
+        />
       ))}
       <ToastViewport />
     </ToastProvider>
