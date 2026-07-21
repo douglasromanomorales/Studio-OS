@@ -3,7 +3,7 @@ import { Avatar } from "@/design-system/primitives/avatar";
 import { Card, CardHeader, CardTitle } from "@/design-system/primitives/card";
 import { Badge } from "@/design-system/primitives/badge";
 import { Button } from "@/design-system/primitives/button";
-import { Breadcrumb } from "@/design-system/workspace/topbar-slot";
+import { Breadcrumb } from "@/design-system/primitives/breadcrumb";
 import { TopbarSlot } from "@/design-system/workspace/topbar-slot";
 import { ConsultaStatusBadge } from "@/components/patterns/consulta-status-badge";
 import { GerarOrcamentoButton } from "./gerar-orcamento-button";
