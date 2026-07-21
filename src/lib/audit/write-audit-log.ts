@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { logger } from "../logging/logger";
 
@@ -57,7 +58,7 @@ export async function writeAuditLog(ctx: AuditContext, event: AuditEvent) {
         action: event.action,
         entityType: event.entityType,
         entityId: event.entityId,
-        payload: maskPayload(event.payload),
+        payload: maskPayload(event.payload) as Prisma.InputJsonValue,
         correlationId: event.correlationId,
       },
     });
