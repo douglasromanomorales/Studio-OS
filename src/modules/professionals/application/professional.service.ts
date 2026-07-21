@@ -25,7 +25,7 @@ export async function cadastrarProfissional(ctx: AuthContext, values: Profission
 
   const db = tenantDb(ctx.organizationId);
   const created = await db.professional.create({
-    data: { name: parsed.data.name, color, commissionRate: parsed.data.commissionRate },
+    data: { organizationId: ctx.organizationId, name: parsed.data.name, color, commissionRate: parsed.data.commissionRate },
   });
 
   await writeAuditLog(ctx, { action: "profissional.cadastrada", entityType: "Professional", entityId: created.id, payload: { name: parsed.data.name } });

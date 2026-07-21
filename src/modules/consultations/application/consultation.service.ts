@@ -29,6 +29,7 @@ export async function createConsulta(ctx: AuthContext, values: ConsultaFormValue
 
   const created = await db.consulta.create({
     data: {
+      organizationId: ctx.organizationId,
       customerId: parsed.data.customerId,
       origin: parsed.data.origin,
       jaFezQuimica: parsed.data.jaFezQuimica,
@@ -55,7 +56,7 @@ export async function createCustomerQuick(ctx: AuthContext, data: { name: string
   const existing = await db.customer.findFirst({ where: { phone } });
   if (existing) throw new ConflictError("Já existe um cliente com este telefone");
 
-  const created = await db.customer.create({ data: { name: data.name, phone } });
+  const created = await db.customer.create({ data: { organizationId: ctx.organizationId, name: data.name, phone } });
   await writeAuditLog(ctx, { action: "cliente.cadastrado", entityType: "Customer", entityId: created.id, payload: { phone, origin: "quick_create_consulta" } });
   return { id: created.id, name: created.name, phone: created.phone };
 }

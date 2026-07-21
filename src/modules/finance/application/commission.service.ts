@@ -74,7 +74,7 @@ export async function pagarComissao(
   const payout = await prisma.$transaction(async (tx) => {
     const scopedDb = tenantDb(ctx.organizationId, tx);
     const created = await scopedDb.commissionPayout.create({
-      data: { professionalId, periodStart, periodEnd, method },
+      data: { organizationId: ctx.organizationId, professionalId, periodStart, periodEnd, method },
     });
     await tx.commissionPayoutItem.createMany({
       data: preview.items.map((item) => ({
@@ -105,7 +105,7 @@ export async function ajustarComissaoPaga(ctx: AuthContext, payoutOriginalId: st
   const adjustment = await prisma.$transaction(async (tx) => {
     const scopedDb = tenantDb(ctx.organizationId, tx);
     const created = await scopedDb.commissionPayout.create({
-      data: { professionalId: original.professionalId, periodStart: original.periodStart, periodEnd: original.periodEnd, adjustsPayoutId: original.id },
+      data: { organizationId: ctx.organizationId, professionalId: original.professionalId, periodStart: original.periodStart, periodEnd: original.periodEnd, adjustsPayoutId: original.id },
     });
     await tx.commissionPayoutItem.createMany({
       data: original.items.map((item) => ({
@@ -163,7 +163,7 @@ export async function fecharCaixa(ctx: AuthContext, dia: Date, countedCents: num
   const differenceCents = diferencaFechamentoCaixa(expectedCentsSnapshot, countedCents);
 
   const closing = await db.cashClosing.create({
-    data: { date: dia, expectedCentsSnapshot, countedCents, closedByMembershipId },
+    data: { organizationId: ctx.organizationId, date: dia, expectedCentsSnapshot, countedCents, closedByMembershipId },
   });
 
   await writeAuditLog(ctx, { action: "financeiro.caixa_fechado", entityType: "CashClosing", entityId: closing.id, payload: { expectedCentsSnapshot, countedCents, differenceCents } });

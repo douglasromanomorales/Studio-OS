@@ -36,6 +36,7 @@ export async function criarOrcamento(ctx: AuthContext, values: CriarOrcamentoVal
 
   const created = await db.orcamento.create({
     data: {
+      organizationId: ctx.organizationId,
       consultaId: parsed.data.consultaId,
       professionalId: parsed.data.professionalId,
       validoAte: parsed.data.validoAte,

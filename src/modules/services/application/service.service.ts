@@ -31,6 +31,7 @@ export async function cadastrarServico(ctx: AuthContext, values: ServicoFormValu
   const db = tenantDb(ctx.organizationId);
   const created = await db.service.create({
     data: {
+      organizationId: ctx.organizationId,
       categoryId: parsed.data.categoryId,
       name: parsed.data.name,
       durationMinutes: parsed.data.durationMinutes,

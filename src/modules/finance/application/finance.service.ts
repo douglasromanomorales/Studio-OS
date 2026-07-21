@@ -22,6 +22,7 @@ export async function registrarRecebimento(ctx: AuthContext, values: RegistrarRe
   const db = tenantDb(ctx.organizationId);
   const created = await db.transaction.create({
     data: {
+      organizationId: ctx.organizationId,
       type: "INCOME",
       amountCents: parsed.data.amountCents,
       method: parsed.data.method,
@@ -43,6 +44,7 @@ export async function registrarEstorno(ctx: AuthContext, transacaoOriginalId: st
 
   const created = await db.transaction.create({
     data: {
+      organizationId: ctx.organizationId,
       type: "EXPENSE",
       amountCents: original.amountCents,
       categoryId: original.categoryId,

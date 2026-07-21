@@ -37,6 +37,7 @@ export async function cadastrarCliente(ctx: AuthContext, values: ClienteFormValu
   const consent = parsed.data.consent ? novoConsentimento() : null;
   const created = await db.customer.create({
     data: {
+      organizationId: ctx.organizationId,
       name: parsed.data.name,
       phone,
       email: parsed.data.email || null,

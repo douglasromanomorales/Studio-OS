@@ -109,12 +109,7 @@ export const toast = {
 /** Monta uma única vez na raiz do Workspace — nunca por módulo. */
 export function Toaster() {
   const [toasts, setToasts] = React.useState<QueuedToast[]>([]);
-  React.useEffect(() => {
-  const unsubscribe = queue.subscribe(setToasts);
-  return () => {
-    unsubscribe();
-  };
-}, []);
+  React.useEffect(() => queue.subscribe(setToasts), []);
 
   return (
     <ToastProvider swipeDirection="right">
