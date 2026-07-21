@@ -1,0 +1,797 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// TENANCY & IDENTIDADE
+// ============================================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  timezone  String   @default("America/Sao_Paulo")
+  // Commission Trigger Policy (cap. 46): parâmetro de configuração, nunca
+  // ramificação hardcoded na Specification de apuração de comissão.
+  commissionTriggerPolicy CommissionTriggerPolicy @default(ON_PAYMENT)
+  plan      Plan     @default(TRIAL)
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  memberships   Membership[]
+  professionals Professional[]
+  customers     Customer[]
+  services      Service[]
+  serviceCategories ServiceCategory[]
+  serviceBundles    ServiceBundle[]
+  packageTemplates  PackageTemplate[]
+  appointments      Appointment[]
+  transactions      Transaction[]
+  transactionCategories TransactionCategory[]
+  commissionPayouts CommissionPayout[]
+  cashClosings      CashClosing[]
+  auditLogs         AuditLog[]
+  products          Product[]
+  consultas         Consulta[]
+  orcamentos        Orcamento[]
+}
+
+enum Plan {
+  TRIAL
+  ESSENTIAL
+  PRO
+  ENTERPRISE
+}
+
+// ADL-109: login sem senha em todo realm — passwordHash removido, nunca existiu
+// necessidade real de senha com magic-link/OTP como único método.
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  emailVerified DateTime?
+  name          String
+  image         String?
+  // Sessão de banco (ADL-108) — activeOrganizationId vive na Session, não aqui.
+  createdAt     DateTime  @default(now())
+
+  memberships Membership[]
+  accounts    Account[]
+  sessions    Session[]
+}
+
+// Modelos exigidos pelo adapter Prisma do Auth.js — específicos de autenticação,
+// nunca confundir com modelos de domínio.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+/**
+ * Sessão de banco, não JWT (ADL-108) — revogável server-side, permite
+ * `activeOrganizationId` mutável sem reautenticação (Organization Switching).
+ * Também carrega o estado de impersonation quando aplicável (ITS, seção 2).
+ */
+model Session {
+  id                   String   @id @default(cuid())
+  sessionToken         String   @unique
+  userId               String
+  expires              DateTime
+  activeOrganizationId String?
+  impersonatingUserId  String?  // preenchido só em sessão de suporte elevada
+  impersonatedByUserId String?  // quem realmente está agindo, durante impersonation
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+/**
+ * AuditLog — Single Owner do "quem/quando/onde" (nunca duplica o que o próprio
+ * fato de domínio já possui). `action` reusa o mesmo nome de evento que todo
+ * `emitirEvento()` já usava como placeholder desde o primeiro domínio — a
+ * migração troca console.log por esta tabela, sem tocar em nenhum Application
+ * Service. Nunca UPDATE — mesmo padrão de Immutable Ledger, aplicado aqui à
+ * trilha de auditoria por consistência, mesmo fora do contexto financeiro.
+ */
+model AuditLog {
+  id                    String   @id @default(cuid())
+  organizationId        String
+  userId                String
+  impersonatedByUserId  String?
+  action                String
+  entityType            String
+  entityId              String
+  payload               Json
+  ipAddress             String?
+  userAgent             String?
+  requestId             String?
+  correlationId         String?
+  createdAt             DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, entityType, entityId])
+  @@index([organizationId, createdAt])
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           StaffRole
+  createdAt      DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+enum StaffRole {
+  OWNER
+  ADMIN
+  RECEPTION
+  PROFESSIONAL
+  FINANCE
+}
+
+// ============================================================
+// PROFISSIONAIS & CREDENCIAIS
+// (credenciais nasceram da descoberta: Botox exige habilitação)
+// ============================================================
+
+model Professional {
+  id             String   @id @default(cuid())
+  organizationId String
+  membershipId   String?
+  name           String
+  color          String   @default("#B15A3E")
+  commissionRate Decimal  @default(0.0) @db.Decimal(5, 2)
+  terminatedAt   DateTime? // Temporal Truth: desligamento é data, nunca boolean `active`
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  credentials       ProfessionalCredential[]
+  specialties       ProfessionalSpecialty[]
+  workingHours      WorkingHours[]
+  scheduleBlocks    ScheduleBlock[]
+  professionalServices ProfessionalService[]
+  appointments      Appointment[]
+  orcamentos        Orcamento[]
+  commissionPayouts CommissionPayout[]
+
+  @@index([organizationId])
+}
+
+// Capability Provenance: especialidade declarada (não regulada externamente,
+// diferente de ProfessionalCredential). Nunca um boolean de capacidade solta.
+model ProfessionalSpecialty {
+  id             String   @id @default(cuid())
+  professionalId String
+  name           String   // ex: "Coloração" — nunca enum fixo, tenants regulam diferente
+  level          String?  // ex: "Avançado" — livre, sem taxonomia imposta pela plataforma
+  declaredAt     DateTime @default(now())
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@unique([professionalId, name])
+}
+
+// Bloqueio de agenda (férias, licença) — já previsto na arquitetura original,
+// formalizado aqui como parte do agregado Profissional.
+model ScheduleBlock {
+  id             String   @id @default(cuid())
+  professionalId String
+  startAt        DateTime
+  endAt          DateTime
+  reason         String?
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@index([professionalId, startAt])
+}
+
+// Credencial cadastrável (ex: "Aplicação de Toxina Botulínica")
+model ProfessionalCredential {
+  id             String   @id @default(cuid())
+  professionalId String
+  name           String
+  registryNumber String?
+  validUntil     DateTime?
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@index([professionalId])
+}
+
+model WorkingHours {
+  id             String   @id @default(cuid())
+  professionalId String
+  weekday        Int      // 0-6
+  startTime      String   // "09:00"
+  endTime        String   // "18:00"
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+}
+
+// ============================================================
+// SERVIÇOS
+// ============================================================
+
+model ServiceCategory {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  order          Int     @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  services     Service[]
+
+  @@index([organizationId])
+}
+
+enum PricingMode {
+  FIXED           // preço fechado, agendável sem intervenção (ex: Bronze Natural)
+  QUOTE_REQUIRED  // exige avaliação humana antes de confirmar preço (maioria dos serviços de cabelo)
+}
+
+model Service {
+  id                 String      @id @default(cuid())
+  organizationId     String
+  categoryId         String
+  name               String
+  durationMinutes    Int
+  price              Decimal?    @db.Decimal(10, 2) // presente só quando pricingMode = FIXED (VO PriceStrategy)
+  pricingMode        PricingMode @default(FIXED)
+  commissionRate     Decimal?    @db.Decimal(5, 2)
+  requiresCredential String?     // gate duro (Capability Provenance) — nome da credencial exigida, null = sem exigência
+  recommendedSpecialties String[] @default([]) // sinal, nunca bloqueio — Requirements VO
+  requiresStrandTest Boolean     @default(false) // gate do Teste de Mechas
+  discontinuedAt     DateTime?   // Temporal Truth: descontinuado é data, nunca boolean `active`
+
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  category     ServiceCategory @relation(fields: [categoryId], references: [id])
+  professionalServices ProfessionalService[]
+  appointments         Appointment[]
+  serviceProducts      ServiceProduct[]
+  bundleItems          ServiceBundleItem[]
+  consultaServices     ConsultaService[]
+  contraindications    Contraindication[]
+  orcamentoItems       OrcamentoItem[]
+
+  @@index([organizationId, categoryId])
+}
+
+// Informativa nesta fase (seção 7 da modelagem) — exibida à profissional, sem
+// bloqueio automático: não existe ainda domínio de intake médico para validar contra.
+model Contraindication {
+  id          String  @id @default(cuid())
+  serviceId   String
+  description String
+
+  service Service @relation(fields: [serviceId], references: [id])
+}
+
+model ProfessionalService {
+  id             String  @id @default(cuid())
+  professionalId String
+  serviceId      String
+  priceOverride  Decimal? @db.Decimal(10, 2)
+  durationOverride Int?
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+  service      Service      @relation(fields: [serviceId], references: [id])
+
+  @@unique([professionalId, serviceId])
+}
+
+// Combo de visita única — ex: "Pacote Pele Iluminada" (Banho de Lua + Detox + Bronze, 1 preço, 1 visita)
+// Distinto de PackageTemplate, que é N sessões ao longo de uma validade.
+model ServiceBundle {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  price          Decimal @db.Decimal(10, 2)
+  description    String?
+  discontinuedAt DateTime? // Temporal Truth — mesmo padrão do Service
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  items        ServiceBundleItem[]
+}
+
+model ServiceBundleItem {
+  id       String @id @default(cuid())
+  bundleId String
+  serviceId String
+
+  bundle  ServiceBundle @relation(fields: [bundleId], references: [id])
+  service Service       @relation(fields: [serviceId], references: [id])
+}
+
+// ============================================================
+// AGENDA
+// ============================================================
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  IN_PROGRESS
+  DONE
+  NO_SHOW
+  CANCELED
+}
+
+enum AppointmentOrigin {
+  ADMIN
+  PORTAL
+  WHATSAPP
+  AI
+}
+
+// ============================================================
+// CONSULTAS — intake: fotos, histórico químico, objetivo da cliente.
+// Nasce do primeiro contato (Instagram/WhatsApp), sem preço envolvido.
+// ============================================================
+
+enum ConsultaStatus {
+  AGUARDANDO_AVALIACAO
+  AVALIADA
+  CONVERTIDA_ORCAMENTO
+  ARQUIVADA
+}
+
+enum ConsultaOrigin {
+  INSTAGRAM
+  WHATSAPP
+  PORTAL
+  ADMIN
+}
+
+model Consulta {
+  id             String         @id @default(cuid())
+  organizationId String
+  customerId     String
+  status         ConsultaStatus @default(AGUARDANDO_AVALIACAO)
+  origin         ConsultaOrigin @default(WHATSAPP)
+
+  // Histórico químico — gate de segurança mapeado na descoberta operacional
+  jaFezQuimica          Boolean   @default(false)
+  tipoUltimoProcedimento String?
+  dataUltimoProcedimento DateTime?
+  alergiaConhecida       Boolean  @default(false)
+  observacoesHistorico   String?
+  precisaTesteMechas     Boolean  @default(false) // exigência derivada da regra — o FATO do teste vive em StrandTestRecord (Cliente)
+
+  objetivoCliente String?
+  notasAvaliacao  String?  // preenchido pela profissional na avaliação
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  customer          Customer           @relation(fields: [customerId], references: [id])
+  photos            ConsultaPhoto[]
+  interestedServices ConsultaService[]
+  orcamento         Orcamento?
+
+  @@index([organizationId, status])
+}
+
+enum ConsultaPhotoType {
+  ATUAL
+  REFERENCIA
+}
+
+model ConsultaPhoto {
+  id          String            @id @default(cuid())
+  consultaId  String
+  type        ConsultaPhotoType
+  storagePath String
+
+  consulta Consulta @relation(fields: [consultaId], references: [id])
+}
+
+model ConsultaService {
+  id         String @id @default(cuid())
+  consultaId String
+  serviceId  String
+
+  consulta Consulta @relation(fields: [consultaId], references: [id])
+  service  Service  @relation(fields: [serviceId], references: [id])
+}
+
+// ============================================================
+// ORÇAMENTOS — precificação. Referencia uma Consulta já avaliada.
+// Só depois de aprovado gera um Appointment.
+// ============================================================
+
+// EXPIRADO removido do enum (Derived Over Stored) — expiração é sempre calculável
+// a partir de validoAte, nunca um estado que alguém precisa marcar manualmente.
+enum OrcamentoStatus {
+  RASCUNHO
+  ENVIADO
+  APROVADO
+  RECUSADO
+}
+
+model Orcamento {
+  id             String          @id @default(cuid())
+  organizationId String
+  consultaId     String          @unique
+  professionalId String
+  // `valor` não existe mais como coluna própria — é derivado de sum(items.amountCents)
+  // no Application Service/Specification, nunca armazenado separadamente (evita a
+  // mesma classe de bug do Teste de Mechas, agora em dinheiro).
+  validoAte      DateTime?
+  status         OrcamentoStatus @default(RASCUNHO)
+  observacoes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  consulta     Consulta        @relation(fields: [consultaId], references: [id])
+  professional Professional    @relation(fields: [professionalId], references: [id])
+  items        OrcamentoItem[]
+  appointments Appointment[]
+}
+
+// QuoteItem da modelagem — nomeado em português para consistência com Orcamento/Consulta.
+model OrcamentoItem {
+  id                  String  @id @default(cuid())
+  orcamentoId         String
+  serviceId           String
+  serviceNameSnapshot String  // Snapshot Principle: retrato histórico, NUNCA controla regra
+  amountCents         Int
+  durationMinutesSnapshot Int // idem — soma vira estimatedDuration derivado do Orçamento
+
+  orcamento Orcamento @relation(fields: [orcamentoId], references: [id])
+  service   Service   @relation(fields: [serviceId], references: [id])
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  DONE
+  NO_SHOW   // só a partir de CONFIRMED
+  CANCELED
+  // IN_PROGRESS removido — vira Specification derivada (atendimentoEmAndamento),
+  // nunca estado persistido (Derived Over Stored).
+}
+
+enum AppointmentCancelReason {
+  CLIENT_REQUEST
+  RESCHEDULED         // usado junto com correlationId apontando para o novo Appointment
+  PROFESSIONAL_UNAVAILABLE
+  OTHER
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  organizationId String
+  // Appointment Identity Principle: os quatro campos abaixo são imutáveis após a
+  // criação. Qualquer mudança de relacionamento exige um novo Appointment.
+  customerId     String
+  professionalId String
+  serviceId      String?           // caminho direto (serviço FIXED, sem Quote)
+  quoteId        String?           // caminho via orçamento aceito — exatamente um dos dois é preenchido
+  startAt        DateTime
+  endAt          DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  origin         AppointmentOrigin @default(ADMIN)
+  notes          String?
+
+  // Snapshot Eligibility (cap. 39) aplicado — as três perguntas responderam sim
+  // para os dois campos abaixo: representam o combinado com a cliente naquele
+  // instante, e mudança futura no catálogo não deve alterá-los retroativamente.
+  durationMinutesSnapshot Int
+  priceCentsSnapshot      Int
+
+  // Reagendamento: AppointmentCancelled(reason=RESCHEDULED) + AppointmentScheduled
+  // novo, correlacionados aqui — nunca um evento appointment.reagendado nem edição
+  // in-place dos campos de identidade.
+  cancelReason   AppointmentCancelReason?
+  correlationId  String?
+
+  createdAt      DateTime          @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  service      Service?      @relation(fields: [serviceId], references: [id])
+  quote        Orcamento?    @relation(fields: [quoteId], references: [id])
+  transactions Transaction[]
+  commissionPayoutItems CommissionPayoutItem[]
+
+  @@index([organizationId, professionalId, startAt])
+}
+
+// ============================================================
+// CLIENTES & PRONTUÁRIO
+// ============================================================
+
+model Customer {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  phone          String   // normalizado E.164 pelo VO Telefone — nunca gravar formatado
+  email          String?
+  instagram      String?
+  birthDate      DateTime?
+  notes          String?
+  consentAt      DateTime?
+  consentVersion String?
+  archivedAt     DateTime? // Temporal Truth: decisão explícita, com data — não boolean
+  anonymizedAt   DateTime?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  appointments Appointment[]
+  record       Record?
+  consultas    Consulta[]
+  strandTests  StrandTestRecord[]
+  tags         CustomerTag[]
+
+  @@unique([organizationId, phone]) // invariante do agregado: telefone único por organização
+  @@index([organizationId])
+}
+
+// Temporal Truth aplicado: o Teste de Mechas é um registro com data e validade,
+// nunca um boolean. Única fonte de verdade — Consulta pergunta, nunca guarda.
+model StrandTestRecord {
+  id          String    @id @default(cuid())
+  customerId  String
+  performedAt DateTime  @default(now())
+  result      String    // ex: "fio resistente, seguro até nível 9"
+  validUntil  DateTime? // null = sem expiração definida; química externa posterior invalida na prática
+  notes       String?
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, performedAt])
+}
+
+model CustomerTag {
+  id         String @id @default(cuid())
+  customerId String
+  label      String // ex: "VIP" (marcação manual — a Policy configurável vem do Financeiro)
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@unique([customerId, label])
+}
+
+model Record {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+
+  customer Customer      @relation(fields: [customerId], references: [id])
+  entries  RecordEntry[]
+}
+
+model RecordEntry {
+  id            String   @id @default(cuid())
+  recordId      String
+  date          DateTime @default(now())
+  procedure     String
+  productsUsed  String?
+  observations  String?
+
+  record Record       @relation(fields: [recordId], references: [id])
+  photos RecordPhoto[]
+}
+
+enum PhotoType {
+  BEFORE
+  AFTER
+  EVOLUTION
+}
+
+model RecordPhoto {
+  id            String    @id @default(cuid())
+  recordEntryId String
+  type          PhotoType
+  storagePath   String
+
+  recordEntry RecordEntry @relation(fields: [recordEntryId], references: [id])
+}
+
+// ============================================================
+// PACOTES (N sessões ao longo de validade — distinto de ServiceBundle)
+// ============================================================
+
+model PackageTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  sessionsTotal  Int
+  validityDays   Int
+  price          Decimal  @db.Decimal(10, 2)
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+// ============================================================
+// FINANCEIRO
+// ============================================================
+
+enum PaymentMethod {
+  PIX
+  CARD_CREDIT
+  CARD_DEBIT
+  CASH
+  TRANSFER
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model TransactionCategory {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String // plano de contas por organização — nunca enum fixo (SaaS First)
+
+  organization  Organization  @relation(fields: [organizationId], references: [id])
+  transactions  Transaction[]
+
+  @@unique([organizationId, name])
+}
+
+/**
+ * Immutable Financial Ledger (cap. 44): nenhuma linha desta tabela é editada depois
+ * de criada — de propósito, não há campo `updatedAt`. Estorno é uma nova linha com
+ * `reversalOfId` apontando para a original (mesmo padrão de
+ * AppointmentCancelled+Scheduled), nunca uma edição in-place.
+ */
+model Transaction {
+  id             String          @id @default(cuid())
+  organizationId String
+  type           TransactionType
+  amountCents    Int
+  method         PaymentMethod?
+  categoryId     String
+  date           DateTime        @default(now())
+  appointmentId  String?         // opcional — nem toda Transaction nasce de um atendimento (ex: despesa de aluguel)
+
+  // Snapshot Eligibility aplicado: recibo é documento entregue, precisa preservar
+  // o contexto textual do momento — ver Financial Responsibility Matrix.
+  descriptionSnapshot String
+
+  // Estorno = nova Transaction referenciando a original. Nunca UPDATE na original.
+  reversalOfId   String?
+
+  // Reservado desde já para conciliação futura (Sprint 3+) — Temporal Truth: data,
+  // nunca boolean `conciliado`. Não operado nesta implementação.
+  reconciledAt   DateTime?
+
+  createdAt      DateTime        @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id])
+  category     TransactionCategory @relation(fields: [categoryId], references: [id])
+  appointment  Appointment?        @relation(fields: [appointmentId], references: [id])
+  reversalOf   Transaction?        @relation("TransactionReversal", fields: [reversalOfId], references: [id])
+  reversals    Transaction[]       @relation("TransactionReversal")
+  commissionPayoutItems CommissionPayoutItem[]
+
+  @@index([organizationId, date])
+  @@index([appointmentId])
+}
+
+enum CommissionTriggerPolicy {
+  ON_PAYMENT    // implementado — comissão só sobre dinheiro recebido
+  ON_COMPLETION // reservado (cap. 46) — não operado nesta implementação
+}
+
+/**
+ * Immutable Financial Ledger: só INSERT. Correção de um payout já registrado é um
+ * novo CommissionPayout com valor negativo e `adjustsPayoutId` apontando para o
+ * original — nunca UPDATE. `totalCents` é derivado da soma dos items (Derived Over
+ * Stored, mesmo padrão de Orcamento.valorTotal), nunca coluna própria.
+ */
+model CommissionPayout {
+  id             String   @id @default(cuid())
+  organizationId String
+  professionalId String
+  periodStart    DateTime
+  periodEnd      DateTime
+  method         PaymentMethod?
+  paidAt         DateTime @default(now())
+  adjustsPayoutId String? // correção de um payout anterior (estorno tardio) — nunca edição
+
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  professional Professional       @relation(fields: [professionalId], references: [id])
+  items        CommissionPayoutItem[]
+  adjustsPayout CommissionPayout? @relation("PayoutAdjustment", fields: [adjustsPayoutId], references: [id])
+  adjustments   CommissionPayout[] @relation("PayoutAdjustment")
+
+  @@index([organizationId, professionalId, periodStart])
+}
+
+/** Payout Snapshot Principle (cap. 45) — os sete campos mínimos para auditoria completa. */
+model CommissionPayoutItem {
+  id                     String   @id @default(cuid())
+  payoutId               String
+  appointmentId          String
+  professionalId         String
+  transactionId          String
+  commissionRateSnapshot Decimal  @db.Decimal(5, 2)
+  baseAmountSnapshot     Int      // valor recebido (ON_PAYMENT) sobre o qual a comissão incidiu
+  commissionAmountSnapshot Int
+  createdAt              DateTime @default(now())
+
+  payout      CommissionPayout @relation(fields: [payoutId], references: [id])
+  appointment Appointment      @relation(fields: [appointmentId], references: [id])
+  transaction Transaction      @relation(fields: [transactionId], references: [id])
+}
+
+/**
+ * Fechamento de caixa — decisão humana explícita, nunca boolean. expectedCentsSnapshot
+ * é congelado no momento do fechamento (Snapshot Eligibility, seção 5 da modelagem);
+ * differenceCents é sempre derivado, nunca armazenado.
+ */
+model CashClosing {
+  id                     String   @id @default(cuid())
+  organizationId         String
+  date                   DateTime
+  expectedCentsSnapshot  Int
+  countedCents           Int
+  closedByMembershipId   String
+  closedAt               DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, date])
+}
+
+// ============================================================
+// ESTOQUE
+// ============================================================
+
+model Product {
+  id             String  @id @default(cuid())
+  organizationId String
+  name           String
+  unit           String
+  minStock       Decimal @default(0) @db.Decimal(10, 2)
+
+  organization Organization      @relation(fields: [organizationId], references: [id])
+  serviceLinks ServiceProduct[]
+}
+
+model ServiceProduct {
+  id          String  @id @default(cuid())
+  serviceId   String
+  productId   String
+  defaultQty  Decimal @db.Decimal(10, 2)
+
+  service Service @relation(fields: [serviceId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+}

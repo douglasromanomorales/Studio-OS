@@ -1,0 +1,30 @@
+/* ===========================================================
+   Tema: Casa Nataly Rodrigues (Studio OS)
+   ===========================================================
+   Extraído do código-fonte real do site institucional.
+   Este arquivo é a ÚNICA fonte de valores de marca no produto.
+   Trocar de tenant/marca = trocar este import, nada mais.
+   =========================================================== */
+
+:root[data-theme="casa-nataly"] {
+  --theme-font-display: 'Playfair Display', 'Times New Roman', serif;
+  --theme-font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --theme-surface-page: #F7F4EF;
+  --theme-surface-card: #FFFFFF;
+  --theme-surface-raised: #FFFFFF;
+  --theme-surface-sunken: #F1ECE2;
+
+  --theme-text-primary: #4A3428;
+  --theme-text-secondary: #6B5A4C;
+  --theme-text-muted: #9C8C7D;
+  --theme-text-on-brand: #FFFFFF;
+
+  --theme-border: rgba(74, 52, 40, .10);
+  --theme-border-strong: rgba(74, 52, 40, .20);
+
+  --theme-brand: #B85A3D;
+  --theme-brand-hover: #9A4A31;
+  --theme-brand-active: #7C3A27;
+  --theme-brand-subtle: rgba(184, 90, 61, .10);
+}

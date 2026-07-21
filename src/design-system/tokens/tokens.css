@@ -1,0 +1,88 @@
+/* ===========================================================
+   CodeChain Design System — Tokens semânticos (camada base)
+   ===========================================================
+   Esta camada NUNCA contém hex de marca. Ela define o vocabulário
+   (o que existe: superfície, texto, borda, accent, radius, motion)
+   e cada produto/tenant injeta os valores via arquivo de tema
+   (ver /themes/*.css). Um componente que referencia --brand aqui
+   funciona identicamente na Casa Nataly, na Sofia IA ou em qualquer
+   cliente futuro — só o tema muda.
+   =========================================================== */
+
+@theme {
+  /* ---------- Tipografia (papéis, não fontes) ---------- */
+  --font-display: var(--theme-font-display, ui-serif, Georgia, serif);
+  --font-body: var(--theme-font-body, ui-sans-serif, system-ui, sans-serif);
+
+  /* ---------- Superfícies ---------- */
+  --surface-page: var(--theme-surface-page, #FAFAF9);
+  --surface-card: var(--theme-surface-card, #FFFFFF);
+  --surface-raised: var(--theme-surface-raised, #FFFFFF);
+  --surface-sunken: var(--theme-surface-sunken, #F4F4F3);
+  --surface-overlay: var(--theme-surface-overlay, rgba(15, 15, 14, .5));
+
+  /* ---------- Texto ---------- */
+  --text-primary: var(--theme-text-primary, #18181B);
+  --text-secondary: var(--theme-text-secondary, #52525B);
+  --text-muted: var(--theme-text-muted, #A1A1AA);
+  --text-on-brand: var(--theme-text-on-brand, #FFFFFF);
+
+  /* ---------- Bordas ---------- */
+  --border: var(--theme-border, rgba(15, 15, 14, .10));
+  --border-strong: var(--theme-border-strong, rgba(15, 15, 14, .20));
+
+  /* ---------- Accent / marca (o produto injeta a cor real) ---------- */
+  --brand: var(--theme-brand, #18181B);
+  --brand-hover: var(--theme-brand-hover, #27272A);
+  --brand-active: var(--theme-brand-active, #09090B);
+  --brand-subtle: var(--theme-brand-subtle, rgba(24, 24, 27, .08));
+
+  /* ---------- Semânticos de estado (fixos — não variam por tema) ---------- */
+  --success: #059669;
+  --success-subtle: rgba(5, 150, 105, .12);
+  --warning: #B45309;
+  --warning-subtle: rgba(217, 119, 6, .14);
+  --danger: #DC2626;
+  --danger-subtle: rgba(220, 38, 38, .12);
+
+  /* ---------- Radius ---------- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* ---------- Espaçamento — escala 4px ---------- */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+  --space-12: 48px; --space-16: 64px;
+
+  /* ---------- Elevação — Stripe-like: quase imperceptível ---------- */
+  --shadow-xs: 0 1px 2px rgba(15, 15, 14, .04);
+  --shadow-sm: 0 1px 3px rgba(15, 15, 14, .06), 0 1px 2px rgba(15, 15, 14, .04);
+  --shadow-md: 0 4px 12px rgba(15, 15, 14, .08);
+  --shadow-lg: 0 12px 32px rgba(15, 15, 14, .12);
+  --shadow-focus: 0 0 0 3px var(--brand-subtle);
+
+  /* ---------- Motion do produto — até 250ms, foco em produtividade ---------- */
+  --ease-product: cubic-bezier(.4, 0, .2, 1);
+  --dur-instant: 100ms;
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 250ms;
+
+  /* ---------- Motion de landing/storytelling — cinematográfico, opt-in ---------- */
+  --ease-cinematic: cubic-bezier(.22, 1, .36, 1);
+  --dur-cinematic-s: .5s;
+  --dur-cinematic-m: .9s;
+  --dur-cinematic-l: 1.6s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@import "../design-system/tokens/tokens.css";
+@import "../design-system/themes/casa-nataly.css";
+
+/* Studio OS ativa o tema Casa Nataly no elemento raiz. Em produção isso é
+   dinâmico por tenant (ex: definido no layout com base na organização logada). */
+html {
+  color-scheme: light;
+}
+body {
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
