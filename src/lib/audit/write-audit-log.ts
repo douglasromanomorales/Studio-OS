@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../db/client";
 import { logger } from "../logging/logger";
 
@@ -26,8 +27,9 @@ export interface AuditEvent {
  */
 const MASKED_KEYS = new Set(["phone", "telefone", "email", "document", "cpf", "cnpj"]);
 
-function maskPayload(payload: Record<string, unknown>): Record<string, unknown> {
+function maskPayload(payload: Record<string, unknown>): Prisma.InputJsonValue {
   const masked: Record<string, unknown> = {};
+
   for (const [key, value] of Object.entries(payload)) {
     if (MASKED_KEYS.has(key.toLowerCase()) && typeof value === "string") {
       masked[key] = value.length > 4 ? `***${value.slice(-4)}` : "***";
@@ -35,7 +37,8 @@ function maskPayload(payload: Record<string, unknown>): Record<string, unknown> 
       masked[key] = value;
     }
   }
-  return masked;
+
+  return masked as Prisma.InputJsonValue;
 }
 
 /**
@@ -61,15 +64,32 @@ export async function writeAuditLog(ctx: AuditContext, event: AuditEvent) {
         correlationId: event.correlationId,
       },
     });
-    logger.info(event.action, { organizationId: ctx.organizationId, entityId: event.entityId, requestId: ctx.requestId });
+
+    logger.info(event.action, {
+      organizationId: ctx.organizationId,
+      entityId: event.entityId,
+      requestId: ctx.requestId,
+    });
   } catch (err) {
     // Falha ao gravar auditoria nunca pode derrubar a operação de negócio que a
     // originou — registra o erro de infraestrutura separadamente e segue.
-    logger.error("auditlog.write_failed", { error: err instanceof Error ? err.message : String(err), action: event.action });
+    logger.error("auditlog.write_failed", {
+      error: err instanceof Error ? err.message : String(err),
+      action: event.action,
+    });
   }
 }
 
 /** Auditoria de tentativa negada — AuthorizationError também é auditável (ITS, seção 6). */
-export async function writeAuthorizationDenied(ctx: AuditContext, action: string, reason: string) {
-  await writeAuditLog(ctx, { action: "authorization.denied", entityType: "AuthorizationAttempt", entityId: action, payload: { reason } });
+export async function writeAuthorizationDenied(
+  ctx: AuditContext,
+  action: string,
+  reason: string
+) {
+  await writeAuditLog(ctx, {
+    action: "authorization.denied",
+    entityType: "AuthorizationAttempt",
+    entityId: action,
+    payload: { reason },
+  });
 }
