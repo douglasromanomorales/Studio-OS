@@ -95,6 +95,7 @@ export async function criarAppointment(ctx: AuthContext, input: CriarAppointment
   // 10. Criar
   const created = await db.appointment.create({
     data: {
+      organizationId: ctx.organizationId,
       customerId: input.customerId,
       professionalId: input.professionalId,
       serviceId: input.serviceId,
